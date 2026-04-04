@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+venv-py39-backup/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Database
+*.db
+
+# Cache
+.openmusic/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
