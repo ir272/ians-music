@@ -382,9 +382,9 @@ async def _resolve_single_spotify_track(
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    "YouTube blocked automated lookup on this machine. "
-                    "Sign into YouTube in Chrome, then set "
-                    "YTDLP_COOKIES_FROM_BROWSER=chrome in backend/.env and retry."
+                    "YouTube blocked this request. "
+                    "Go to Settings (gear icon) and upload a cookies.txt file exported from a "
+                    "logged-in YouTube session to bypass this check."
                 ),
             )
         raise HTTPException(
