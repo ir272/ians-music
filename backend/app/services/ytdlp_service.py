@@ -57,13 +57,17 @@ _BASE_OPTS: dict = {
 
 
 def _cookie_browser_specs() -> list[tuple[str, Optional[str]]]:
-    """Return yt-dlp browser-cookie sources to try for YouTube requests."""
-    configured = os.getenv("YTDLP_COOKIES_FROM_BROWSER", "").strip()
-    if configured:
-        candidates = [part.strip() for part in configured.split(",") if part.strip()]
-    else:
-        candidates = list(_COOKIE_BROWSER_CANDIDATES)
+    """Return yt-dlp browser-cookie sources to try for YouTube requests.
 
+    Returns an empty list when YTDLP_COOKIES_FROM_BROWSER is not set so that
+    headless server deployments (where no browser is installed) do not attempt
+    cookie extraction and surface a confusing error.
+    """
+    configured = os.getenv("YTDLP_COOKIES_FROM_BROWSER", "").strip()
+    if not configured:
+        return []
+
+    candidates = [part.strip() for part in configured.split(",") if part.strip()]
     specs: list[tuple[str, Optional[str]]] = []
     for candidate in candidates:
         browser, _, profile = candidate.partition(":")
