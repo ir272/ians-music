@@ -43,7 +43,7 @@ export function PlaylistRail({ activePlaylistId = null, compact = false }: Playl
   }, [newName]);
 
   return (
-    <aside className={`border-l border-black bg-[#0f0f12] text-white ${compact ? "w-[280px]" : "w-[320px]"} shrink-0`}>
+    <aside className={`hidden lg:flex flex-col border-l border-black bg-[#0f0f12] text-white ${compact ? "w-[280px]" : "w-[320px]"} shrink-0`}>
       <div className="h-14 border-b border-white/10 flex items-center justify-between px-6">
         <h2 className="text-[14px] font-bold tracking-tight">Playlists</h2>
         <button

@@ -323,7 +323,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden">
       <div className="flex flex-1 w-full overflow-hidden">
-        <div className="relative flex h-full w-64 flex-col bg-background-light border-r border-black shrink-0">
+        <div className="relative hidden md:flex h-full w-64 flex-col bg-background-light border-r border-black shrink-0">
           <div className="flex h-full flex-col justify-between p-4">
             <div className="flex flex-col gap-4">
               <h1 className="text-black text-xl font-black uppercase tracking-widest border-b-2 border-black pb-2">
@@ -361,6 +361,22 @@ export default function HomePage() {
         </div>
 
         <div className="flex flex-col flex-1 h-full overflow-hidden relative">
+          {/* Mobile-only navigation bar */}
+          <div className="flex md:hidden border-b border-black bg-background-light h-11 items-center shrink-0">
+            <Link href="/nexus" className="flex items-center gap-2 px-4 h-full text-[11px] font-black uppercase hover:bg-black hover:text-white transition-colors border-r border-black">
+              <span className="material-symbols-outlined text-[16px]">play_circle</span>
+              Nexus
+            </Link>
+            <div className="flex items-center gap-2 px-4 h-full text-[11px] font-black uppercase bg-black text-white border-r border-black">
+              <span className="material-symbols-outlined text-primary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>archive</span>
+              Archive
+            </div>
+            <Link href="/studio" className="flex items-center gap-2 px-4 h-full text-[11px] font-black uppercase hover:bg-black hover:text-white transition-colors border-r border-black">
+              <span className="material-symbols-outlined text-[16px]">cut</span>
+              Studio
+            </Link>
+          </div>
+
           <div className="h-14 bg-background-light border-b border-black flex items-center px-6 shrink-0">
             <div className="mono text-2xl font-black tracking-tighter text-black flex items-center gap-4">
               <span className="text-primary">SETLIST_ALPHA</span>
@@ -413,8 +429,8 @@ export default function HomePage() {
               <div className="sticky top-0 bg-black text-white border-b border-black flex w-full h-10 items-center text-[10px] font-black uppercase tracking-wider z-20 mono">
                 <div className="w-16 px-4 border-r border-white/20 h-full flex items-center">SRC</div>
                 <div className="flex-1 px-4 border-r border-white/20 h-full flex items-center">TRACK_NAME</div>
-                <div className="flex-1 px-4 border-r border-white/20 h-full flex items-center">ARTIST</div>
-                <div className="w-[180px] px-4 h-full flex items-center justify-center">ACTIONS</div>
+                <div className="hidden sm:flex flex-1 px-4 border-r border-white/20 h-full items-center">ARTIST</div>
+                <div className="w-[80px] sm:w-[180px] px-4 h-full flex items-center justify-center">ACTIONS</div>
               </div>
 
               <div className="flex flex-col w-full pb-32 mono text-xs font-bold">
@@ -441,16 +457,16 @@ export default function HomePage() {
                           <div className="flex-1 px-4 grid-border-r h-full flex items-center truncate uppercase">
                             {track.title}
                           </div>
-                          <div className="flex-1 px-4 grid-border-r h-full flex items-center truncate opacity-60">
+                          <div className="hidden sm:flex flex-1 px-4 grid-border-r h-full items-center truncate opacity-60">
                             {track.artist}
                           </div>
-                          <div className="w-[180px] px-2 h-full flex items-center justify-end gap-2">
+                          <div className="w-[80px] sm:w-[180px] px-2 h-full flex items-center justify-end gap-1 sm:gap-2">
                             <button
                               onClick={(event) => {
                                 event.stopPropagation();
                                 handlePlayTrack(track);
                               }}
-                              className={`h-7 w-20 border-2 text-[10px] font-black uppercase transition-colors flex items-center justify-center gap-1 ${
+                              className={`h-7 w-[60px] sm:w-20 border-2 text-[10px] font-black uppercase transition-colors flex items-center justify-center gap-1 ${
                                 isCurrent && isPlaying
                                   ? "border-primary bg-primary text-white"
                                   : "border-black bg-white text-black hover:bg-black hover:text-white"
@@ -459,12 +475,12 @@ export default function HomePage() {
                               <span className="material-symbols-outlined text-[14px]">
                                 {isCurrent && isPlaying ? "pause" : "play_arrow"}
                               </span>
-                              {isCurrent && isPlaying ? "Pause" : "Play"}
+                              <span className="hidden sm:inline">{isCurrent && isPlaying ? "Pause" : "Play"}</span>
                             </button>
                             <Link
                               href={`/studio/edit?trackId=${encodeURIComponent(track.trackId)}`}
                               onClick={(event) => event.stopPropagation()}
-                              className="h-7 w-20 border-2 border-black text-[10px] font-black uppercase hover:bg-primary hover:border-primary hover:text-white transition-colors flex items-center justify-center gap-1 bg-white text-black"
+                              className="hidden sm:flex h-7 w-20 border-2 border-black text-[10px] font-black uppercase hover:bg-primary hover:border-primary hover:text-white transition-colors items-center justify-center gap-1 bg-white text-black"
                             >
                               <span className="material-symbols-outlined text-[14px]">content_cut</span>
                               Edit
@@ -473,7 +489,7 @@ export default function HomePage() {
                         </div>
 
                         {isExpanded && (
-                          <div className="relative w-full min-h-[18rem] p-8 overflow-hidden flex gap-10 z-0 border-t border-black bg-white">
+                          <div className="relative w-full p-4 sm:p-8 overflow-hidden flex flex-col sm:flex-row gap-6 sm:gap-10 z-0 border-t border-black bg-white">
                             <div
                               className="absolute inset-0 opacity-10"
                               style={{
@@ -482,7 +498,7 @@ export default function HomePage() {
                                 backgroundSize: "20px 20px",
                               }}
                             />
-                            <div className="relative w-56 h-56 shrink-0 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden bg-black">
+                            <div className="relative w-28 h-28 sm:w-56 sm:h-56 shrink-0 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden bg-black">
                               {track.thumbnailUrl ? (
                                 <Image
                                   fill
@@ -503,7 +519,7 @@ export default function HomePage() {
                             </div>
 
                             <div className="flex-1 flex flex-col z-10 font-mono text-[12px] justify-center text-black">
-                              <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-8">
+                              <div className="grid grid-cols-2 gap-x-4 sm:gap-x-12 gap-y-4 sm:gap-y-6 mb-6 sm:mb-8">
                                 <div className="flex flex-col border-b-2 border-black pb-2">
                                   <span className="text-[10px] font-black mb-1 opacity-40">LENGTH</span>
                                   <span className="font-black text-lg uppercase">{formatDuration(track.durationMs)}</span>
@@ -599,7 +615,7 @@ export default function HomePage() {
                                       return (
                                         <div
                                           key={clip.id}
-                                          className="grid grid-cols-[minmax(0,1fr)_140px_260px] gap-3 px-3 py-3 items-center"
+                                          className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_140px_260px] gap-2 sm:gap-3 px-3 py-3 items-center"
                                         >
                                           <div className="min-w-0">
                                             <div className="truncate text-[11px] font-black uppercase">
@@ -609,11 +625,11 @@ export default function HomePage() {
                                               {formatClipRange(clip, track)}
                                             </div>
                                           </div>
-                                          <div className="text-[10px] uppercase">
+                                          <div className="hidden sm:block text-[10px] uppercase">
                                             <div>Fade in: {formatDuration(clip.fadeInMs)}</div>
                                             <div>Fade out: {formatDuration(clip.fadeOutMs)}</div>
                                           </div>
-                                          <div className="flex gap-2 justify-end">
+                                          <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
                                             <button
                                               type="button"
                                               onClick={() => handlePlayClip(track, clip)}

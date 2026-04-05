@@ -70,9 +70,9 @@ export function RevampPlaybackBar() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center px-4 justify-between">
-        <div className="flex items-center gap-4 w-1/3 min-w-0">
-          <div className="w-14 h-14 bg-gradient-to-br from-gray-700 to-gray-900 rounded overflow-hidden flex items-center justify-center shrink-0 border border-white/5 relative group cursor-pointer shadow-md">
+      <div className="flex-1 flex items-center px-3 sm:px-4 justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 sm:w-1/3 sm:flex-none">
+          <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-gray-700 to-gray-900 rounded overflow-hidden flex items-center justify-center shrink-0 border border-white/5 relative group cursor-pointer shadow-md">
             {currentTrack?.thumbnailUrl ? (
               <Image
                 fill
@@ -94,12 +94,12 @@ export function RevampPlaybackBar() {
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center gap-2 w-1/3 max-w-[400px]">
-          <div className="flex items-center gap-6">
+        <div className="flex flex-col items-center justify-center gap-2 shrink-0 sm:w-1/3 sm:max-w-[400px]">
+          <div className="flex items-center gap-4 sm:gap-6">
             <button
               onClick={prev}
               disabled={!currentTrack}
-              className="text-white/70 hover:text-white transition-colors cursor-pointer material-symbols-outlined text-[28px] disabled:opacity-30"
+              className="text-white/70 hover:text-white transition-colors cursor-pointer material-symbols-outlined text-[22px] sm:text-[28px] disabled:opacity-30"
               style={{ fontVariationSettings: "'FILL' 1" }}
             >
               skip_previous
@@ -107,10 +107,10 @@ export function RevampPlaybackBar() {
             <button
               onClick={togglePlay}
               disabled={!currentTrack}
-              className="w-9 h-9 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform cursor-pointer shadow-lg disabled:opacity-30"
+              className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform cursor-pointer shadow-lg disabled:opacity-30"
             >
               <span
-                className={`material-symbols-outlined text-black text-2xl ${isBuffering ? "animate-pulse" : ""}`}
+                className={`material-symbols-outlined text-black text-xl sm:text-2xl ${isBuffering ? "animate-pulse" : ""}`}
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 {isPlaying ? "pause" : "play_arrow"}
@@ -119,7 +119,7 @@ export function RevampPlaybackBar() {
             <button
               onClick={next}
               disabled={!currentTrack}
-              className="text-white/70 hover:text-white transition-colors cursor-pointer material-symbols-outlined text-[28px] disabled:opacity-30"
+              className="text-white/70 hover:text-white transition-colors cursor-pointer material-symbols-outlined text-[22px] sm:text-[28px] disabled:opacity-30"
               style={{ fontVariationSettings: "'FILL' 1" }}
             >
               skip_next
@@ -127,7 +127,7 @@ export function RevampPlaybackBar() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-4 w-1/3 text-white/50">
+        <div className="hidden sm:flex items-center justify-end gap-4 w-1/3 text-white/50">
           <span className="text-xs font-mono font-medium mx-2">
             {currentTrack
               ? `${formatTime(currentTimeMs)} / ${formatTime(durationMs)}`
