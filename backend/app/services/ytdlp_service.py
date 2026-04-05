@@ -60,7 +60,10 @@ def _js_runtime_config() -> dict[str, dict[str, Any]]:
 def _base_opts() -> dict:
     """Build base yt-dlp options, injecting a cookie file if one is present."""
     opts: dict = {
-        "format": "bestaudio/best",
+        # Prefer progressive audio-only formats; fall back to any muxed format
+        # that contains audio rather than failing on DASH-only formats that
+        # YouTube gates behind stricter client checks.
+        "format": "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best[acodec!=none]/best",
         "quiet": True,
         "no_warnings": True,
         "extract_flat": False,
