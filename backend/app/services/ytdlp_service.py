@@ -52,7 +52,9 @@ _BASE_OPTS: dict = {
     "no_warnings": True,
     "extract_flat": False,
     "nocheckcertificate": True,
-    "js_runtimes": _js_runtime_config(),
+    # Use Android client to bypass YouTube PO token requirement on headless servers.
+    # The Android client doesn't require Proof-of-Origin tokens or browser cookies.
+    "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
 }
 
 
