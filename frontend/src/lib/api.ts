@@ -205,3 +205,29 @@ export async function removePlaylistItem(
     method: "DELETE",
   });
 }
+
+export interface CookieStatus {
+  is_set: boolean;
+  updated_at: string | null;
+  size_bytes: number;
+}
+
+export async function getCookieStatus(): Promise<CookieStatus> {
+  return request<CookieStatus>("/api/settings/cookies");
+}
+
+export async function uploadCookieFile(file: File): Promise<{ ok: boolean }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/settings/cookies", { method: "POST", body: form });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new ApiError(json?.detail ?? `Upload failed (${res.status})`, res.status);
+  }
+  return res.json();
+}
+
+export async function deleteCookieFile(): Promise<void> {
+  await request<void>("/api/settings/cookies", { method: "DELETE" });
+}
+

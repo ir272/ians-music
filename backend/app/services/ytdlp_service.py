@@ -35,6 +35,17 @@ class AudioStreamInfo:
 
 _COOKIE_BROWSER_CANDIDATES = ("chrome", "safari", "brave", "edge", "firefox")
 
+_COOKIE_FILE_PATH = os.getenv("COOKIE_FILE_PATH", "/data/yt_cookies.txt")
+
+
+def _active_cookie_file() -> Optional[str]:
+    """Return the cookie file path if it exists, else None."""
+    path = _COOKIE_FILE_PATH
+    parent = os.path.dirname(path) or "."
+    if not os.path.isdir(parent):
+        path = os.path.join(os.getcwd(), "yt_cookies.txt")
+    return path if os.path.isfile(path) else None
+
 
 def _js_runtime_config() -> dict[str, dict[str, Any]]:
     configured = os.getenv("YTDLP_JS_RUNTIMES", "").strip()
@@ -46,13 +57,20 @@ def _js_runtime_config() -> dict[str, dict[str, Any]]:
     return {runtime: {} for runtime in runtimes}
 
 
-_BASE_OPTS: dict = {
-    "format": "bestaudio/best",
-    "quiet": True,
-    "no_warnings": True,
-    "extract_flat": False,
-    "nocheckcertificate": True,
-}
+def _base_opts() -> dict:
+    """Build base yt-dlp options, injecting a cookie file if one is present."""
+    opts: dict = {
+        "format": "bestaudio/best",
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "nocheckcertificate": True,
+    }
+    cookie_file = _active_cookie_file()
+    if cookie_file:
+        opts["cookiefile"] = cookie_file
+        logger.debug("Using cookie file: %s", cookie_file)
+    return opts
 
 
 def _cookie_browser_specs() -> list[tuple[str, Optional[str]]]:
@@ -172,7 +190,7 @@ def _extract_info_with_fallback(
 
 def _extract_sync(url: str) -> TrackInfo:
     """Run yt-dlp extract_info synchronously (call from asyncio.to_thread)."""
-    opts = {**_BASE_OPTS}
+    opts = _base_opts()
     info = _extract_info_with_fallback(opts, url, download=False)
 
     if info is None:
@@ -242,7 +260,7 @@ async def extract_info(url: str) -> TrackInfo:
 
 def _get_audio_url_sync(url: str) -> str:
     """Re-extract just the audio stream URL (for cache misses on replay)."""
-    opts = {**_BASE_OPTS}
+    opts = _base_opts()
     info = _extract_info_with_fallback(opts, url, download=False)
 
     if info is None:
@@ -262,7 +280,7 @@ async def get_audio_url(source_url: str) -> str:
 
 def _get_audio_stream_info_sync(source_url: str) -> AudioStreamInfo:
     """Re-extract a direct stream URL together with required request headers."""
-    opts = {**_BASE_OPTS}
+    opts = _base_opts()
     info = _extract_info_with_fallback(opts, source_url, download=False)
 
     if info is None:
@@ -286,7 +304,7 @@ def _download_audio_sync(source_url: str, output_path: str) -> str:
     Returns the actual output file path (yt-dlp may change the extension).
     """
     opts = {
-        **_BASE_OPTS,
+        **_base_opts(),
         "outtmpl": output_path,
         "overwrites": True,
     }
@@ -339,7 +357,7 @@ class YouTubeSearchResult:
 def _search_youtube_sync(query: str, num_results: int = 5) -> list[YouTubeSearchResult]:
     """Search YouTube via yt-dlp and return results with metadata."""
     opts = {
-        **_BASE_OPTS,
+        **_base_opts(),
         "extract_flat": False,
         "default_search": "ytsearch",
     }

@@ -15,6 +15,7 @@ import {
 import { PlaylistRail } from "@/components/PlaylistRail";
 import { usePlayerContext } from "@/lib/PlayerContext";
 import { RevampPlaybackBar } from "@/components/RevampPlaybackBar";
+import { SettingsModal } from "@/components/SettingsModal";
 import type { Clip, Playlist, Track } from "@/types";
 
 function formatDuration(ms: number): string {
@@ -68,6 +69,7 @@ export default function HomePage() {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [isSavingToPlaylist, setIsSavingToPlaylist] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const {
     currentTrack,
@@ -322,6 +324,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden">
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <div className="flex flex-1 w-full overflow-hidden">
         <div className="relative hidden md:flex h-full w-64 flex-col bg-background-light border-r border-black shrink-0">
           <div className="flex h-full flex-col justify-between p-4">
@@ -413,6 +416,13 @@ export default function HomePage() {
             <div className="text-[10px] uppercase tracking-[0.2em] text-black font-black bg-black text-white px-2 py-1">
               {isResolving ? "Query Active" : "Query Idle"}
             </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+              className="ml-3 text-black/50 hover:text-black transition-colors material-symbols-outlined text-[20px]"
+            >
+              settings
+            </button>
           </div>
 
           {(error || message) && (

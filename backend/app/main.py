@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import init_db
-from app.routers import audio, clips, playlists, resolve
+from app.routers import audio, clips, playlists, resolve, settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ app.include_router(resolve.router)
 app.include_router(audio.router)
 app.include_router(clips.router)
 app.include_router(playlists.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")
