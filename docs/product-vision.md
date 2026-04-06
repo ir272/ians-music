@@ -1,6 +1,6 @@
 # OpenMusic — Product Vision
 
-> Updated 04/04/2026.
+> Updated 04/06/2026.
 
 ## Positioning
 
@@ -116,19 +116,21 @@ Examples already in scope conceptually:
 
 ### Current product
 
-Today, OpenMusic is best described as:
+OpenMusic is live and hosted (Fly.io + Vercel). It is best described as:
 
-- a local-first multi-source archive
+- a hosted multi-source music archive
 - a clip-aware playlist player
 - a foundation for later editing and migration features
 
-It already supports:
+It currently supports:
 
-- multi-platform track ingestion by URL
-- Spotify track, album, and playlist ingestion through matching
-- clip creation
-- playlist construction from tracks or clips
-- persistent playback and ordering
+- Multi-platform ingestion (YouTube, Spotify, TikTok, SoundCloud)
+- Spotify track, album, and playlist import via metadata + YouTube matching
+- Clip creation with tap-to-mark, timestamp editing, draggable markers
+- Playlist construction from full tracks or clips
+- Persistent player with loop modes and clip boundary enforcement
+- Per-track mix settings (playback rate, gain)
+- YouTube cookie authentication via settings UI
 
 ### Target product
 

@@ -1,26 +1,28 @@
 # OpenMusic — Feature Research
 
-> Reviewed and updated 04/04/2026 against the live codebase.
+> Updated 04/06/2026.
 
-This document is intentionally forward-looking. It should be read alongside [product-vision.md](product-vision.md), which explains where the product is heading. The notes below mark what is already shipped, what is still future work, and which older assumptions were inaccurate.
+Forward-looking research. Read alongside [product-vision.md](product-vision.md). Notes below mark what is shipped, what is future work, and what older assumptions to discard.
 
 ## Reality Check
 
-Already implemented in the current app:
+Already implemented:
 
-- Spotify track support via metadata plus YouTube matching
-- Spotify album and playlist bulk import
-- TikTok short-link resolution and explicit rejection of unsupported TikTok sound pages
-- TikTok source attribution stored as `source_credit`
+- Spotify track, album, and playlist import via metadata + YouTube matching
+- TikTok short-link resolution and explicit rejection of sound pages
+- TikTok `source_credit` attribution (`via @username`)
 - Archive drag reorder with persisted positions
 - Playlist item drag reorder with persisted positions
-- Clip editor with tap-to-mark and draggable in/out markers
+- Clip editor with tap-to-mark, timestamp editing, and draggable in/out markers
 - Global player loop modes for track and playlist
+- Per-track mix settings (playback rate, gain)
+- YouTube cookie upload via settings UI
+- bgutil PO token server for YouTube bot-check bypass (hosted on Fly.io)
 
 Still not implemented:
 
-- Playlist import from external services
-- Speed, volume, and transition editing
+- Playlist import from external services (Spotify, Apple Music)
+- Speed, volume, and transition editing UI
 - In-app search
 - Waveform visualization
 - Web Audio API graph
@@ -29,11 +31,13 @@ Still not implemented:
 - Crossfade or gapless playback
 - Audio normalization
 
-Older assumptions to ignore:
+Older assumptions to discard:
 
-- The backend does not currently stream remote audio while caching it at the same time.
-- The live API does not expose a `/api/search` endpoint.
-- The current player still uses a single HTML audio element rather than a Web Audio pipeline.
+- The app is **hosted** (Fly.io + Vercel), not local-first. No local setup path.
+- The backend does not stream remote audio while caching simultaneously.
+- There is no `/api/search` endpoint.
+- The player uses a single HTML audio element, not a Web Audio pipeline.
+- YouTube search uses `extract_flat=True` — fetching full player data per result causes bot blocks from datacenter IPs.
 
 ---
 
