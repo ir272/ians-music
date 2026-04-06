@@ -26,8 +26,8 @@ RUN git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.
 RUN mkdir -p /root/bgutil-ytdlp-pot-provider \
     && ln -s /bgutil/server /root/bgutil-ytdlp-pot-provider/server
 
-# Pre-cache Deno dependencies so startup is fast
-RUN cd /bgutil/server && DENO_DIR=/bgutil/.deno deno cache src/main.ts
+# Pre-cache Deno dependencies so startup and per-request token generation are fast
+RUN cd /bgutil/server && DENO_DIR=/bgutil/.deno deno cache src/main.ts src/generate_once.ts
 
 WORKDIR /app
 
