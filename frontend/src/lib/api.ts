@@ -7,6 +7,7 @@ import type {
   ResolveResponse,
   BatchResolveResponse,
   TrackMixSettings,
+  TrackMediaStatus,
 } from "@/types";
 
 class ApiError extends Error {
@@ -137,6 +138,10 @@ export async function updateClip(
 
 export async function getTrackMixSettings(trackId: string): Promise<TrackMixSettings> {
   return request<TrackMixSettings>(`/api/tracks/${trackId}/mix-settings`);
+}
+
+export async function getTrackMediaStatus(trackId: string): Promise<TrackMediaStatus> {
+  return request<TrackMediaStatus>(`/api/tracks/${trackId}/media`);
 }
 
 export async function updateTrackMixSettings(

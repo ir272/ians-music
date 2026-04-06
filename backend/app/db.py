@@ -68,6 +68,17 @@ CREATE TABLE IF NOT EXISTS spotify_youtube_map (
   spotify_url TEXT PRIMARY KEY,
   youtube_url TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS media_jobs (
+  id            TEXT PRIMARY KEY,
+  track_id      TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+  job_type      TEXT NOT NULL,
+  status        TEXT NOT NULL,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  last_error    TEXT,
+  created_at    TEXT DEFAULT (datetime('now')),
+  updated_at    TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -98,6 +109,15 @@ async def init_db() -> None:
 
         if "match_confidence" not in columns:
             await db.execute("ALTER TABLE tracks ADD COLUMN match_confidence REAL")
+
+        if "media_state" not in columns:
+            await db.execute("ALTER TABLE tracks ADD COLUMN media_state TEXT NOT NULL DEFAULT 'resolved'")
+
+        if "last_media_error" not in columns:
+            await db.execute("ALTER TABLE tracks ADD COLUMN last_media_error TEXT")
+
+        if "last_prepared_at" not in columns:
+            await db.execute("ALTER TABLE tracks ADD COLUMN last_prepared_at TEXT")
 
         cursor = await db.execute("PRAGMA table_info(clips)")
         clip_columns = {row[1] for row in await cursor.fetchall()}

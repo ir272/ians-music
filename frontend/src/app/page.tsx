@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   addPlaylistItem,
   createPlaylist,
   getAllClips,
   getPlaylists,
+  getTrackMediaStatus,
   getTracks,
   isBatchResponse,
   resolveTrack,
@@ -16,7 +17,7 @@ import { PlaylistRail } from "@/components/PlaylistRail";
 import { usePlayerContext } from "@/lib/PlayerContext";
 import { RevampPlaybackBar } from "@/components/RevampPlaybackBar";
 import { SettingsModal } from "@/components/SettingsModal";
-import type { Clip, Playlist, Track } from "@/types";
+import type { Clip, Playlist, Track, TrackMediaState, TrackMediaStatus } from "@/types";
 
 function formatDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -56,6 +57,32 @@ function platformClass(platform: string): string {
   return colors[platform.toLowerCase()] ?? "text-black";
 }
 
+function mediaStateLabel(state?: TrackMediaState): string {
+  switch (state) {
+    case "ready":
+      return "Ready";
+    case "queued":
+      return "Queued";
+    case "extracting":
+      return "Preparing";
+    case "failed":
+      return "Failed";
+    case "stale":
+      return "Stale";
+    default:
+      return "Resolved";
+  }
+}
+
+function applyMediaStatus(track: Track, media: Pick<Track, "mediaState" | "isPlayable" | "lastMediaError">): Track {
+  return {
+    ...track,
+    mediaState: media.mediaState,
+    isPlayable: media.isPlayable,
+    lastMediaError: media.lastMediaError,
+  };
+}
+
 export default function HomePage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [clips, setClips] = useState<Clip[]>([]);
@@ -70,6 +97,8 @@ export default function HomePage() {
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [isSavingToPlaylist, setIsSavingToPlaylist] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const libraryRequestRef = useRef<Promise<void> | null>(null);
+  const playlistRequestRef = useRef<Promise<void> | null>(null);
 
   const {
     currentTrack,
@@ -82,17 +111,25 @@ export default function HomePage() {
   } = usePlayerContext();
 
   const loadLibrary = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [loadedTracks, loadedClips] = await Promise.all([getTracks(), getAllClips()]);
-      setTracks(loadedTracks);
-      setClips(loadedClips);
-      setExpandedTrackId((prev) => prev ?? loadedTracks[0]?.trackId ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load archive");
-    } finally {
-      setIsLoading(false);
+    if (libraryRequestRef.current) {
+      return libraryRequestRef.current;
     }
+    setIsLoading(true);
+    const request = (async () => {
+      try {
+        const [loadedTracks, loadedClips] = await Promise.all([getTracks(), getAllClips()]);
+        setTracks(loadedTracks);
+        setClips(loadedClips);
+        setExpandedTrackId((prev) => prev ?? loadedTracks[0]?.trackId ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load archive");
+      } finally {
+        setIsLoading(false);
+        libraryRequestRef.current = null;
+      }
+    })();
+    libraryRequestRef.current = request;
+    return request;
   }, []);
 
   useEffect(() => {
@@ -100,18 +137,58 @@ export default function HomePage() {
   }, [loadLibrary]);
 
   const loadPlaylists = useCallback(async () => {
-    try {
-      const loadedPlaylists = await getPlaylists();
-      setPlaylists(loadedPlaylists);
-      setSelectedPlaylistId((prev) => prev ?? loadedPlaylists[0]?.id ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load playlists");
+    if (playlistRequestRef.current) {
+      return playlistRequestRef.current;
     }
+    const request = (async () => {
+      try {
+        const loadedPlaylists = await getPlaylists();
+        setPlaylists(loadedPlaylists);
+        setSelectedPlaylistId((prev) => prev ?? loadedPlaylists[0]?.id ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load playlists");
+      } finally {
+        playlistRequestRef.current = null;
+      }
+    })();
+    playlistRequestRef.current = request;
+    return request;
   }, []);
 
   useEffect(() => {
     loadPlaylists();
   }, [loadPlaylists]);
+
+  useEffect(() => {
+    const handleTrackMediaStatus = (event: Event) => {
+      const media = (event as CustomEvent<TrackMediaStatus>).detail;
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.trackId === media.trackId
+            ? applyMediaStatus(track, {
+                mediaState: media.mediaState,
+                isPlayable: media.isPlayable,
+                lastMediaError: media.lastMediaError ?? null,
+              })
+            : track
+        )
+      );
+    };
+
+    const handlePlaybackError = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      if (detail?.message) {
+        setError(detail.message);
+      }
+    };
+
+    window.addEventListener("openmusic:track-media-status", handleTrackMediaStatus);
+    window.addEventListener("openmusic:playback-error", handlePlaybackError);
+    return () => {
+      window.removeEventListener("openmusic:track-media-status", handleTrackMediaStatus);
+      window.removeEventListener("openmusic:playback-error", handlePlaybackError);
+    };
+  }, []);
 
   useEffect(() => {
     const refreshArchive = () => {
@@ -183,6 +260,9 @@ export default function HomePage() {
             platform: track.platform,
             matchedSourceUrl: track.matchedSourceUrl,
             matchConfidence: track.matchConfidence,
+            mediaState: track.mediaState ?? "resolved",
+            isPlayable: track.isPlayable ?? false,
+            lastMediaError: track.lastMediaError ?? null,
           }));
 
           if (addedTracks.length > 0) {
@@ -206,6 +286,9 @@ export default function HomePage() {
             platform: result.platform,
             matchedSourceUrl: result.matchedSourceUrl,
             matchConfidence: result.matchConfidence,
+            mediaState: result.mediaState ?? "resolved",
+            isPlayable: result.isPlayable ?? false,
+            lastMediaError: result.lastMediaError ?? null,
           };
 
           setTracks((prev) => {
@@ -227,11 +310,35 @@ export default function HomePage() {
   );
 
   const handlePlayTrack = useCallback(
-    (track: Track) => {
+    async (track: Track) => {
+      if (track.mediaState === "queued" || track.mediaState === "extracting") {
+        setMessage(`"${track.title}" is still preparing for playback.`);
+        return;
+      }
+      if (track.mediaState === "failed" && track.lastMediaError) {
+        setError(track.lastMediaError);
+      }
+
       if (currentTrack?.trackId === track.trackId && isPlaying) {
         togglePlay();
       } else {
         playTrack(track);
+        try {
+          const media = await getTrackMediaStatus(track.trackId);
+          setTracks((prev) =>
+            prev.map((item) =>
+              item.trackId === track.trackId
+                ? applyMediaStatus(item, {
+                    mediaState: media.mediaState,
+                    isPlayable: media.isPlayable,
+                    lastMediaError: media.lastMediaError ?? null,
+                  })
+                : item
+            )
+          );
+        } catch {
+          // The player refreshes media status again if the audio element fails.
+        }
       }
     },
     [currentTrack?.trackId, isPlaying, playTrack, togglePlay]
@@ -452,6 +559,9 @@ export default function HomePage() {
                   tracks.map((track) => {
                     const isExpanded = expandedTrackId === track.trackId;
                     const isCurrent = currentTrack?.trackId === track.trackId;
+                    const mediaLabel = mediaStateLabel(track.mediaState);
+                    const isPreparing = track.mediaState === "queued" || track.mediaState === "extracting";
+                    const isFailed = track.mediaState === "failed";
 
                     return (
                       <div key={track.trackId} className="flex flex-col w-full border-b border-black">
@@ -465,7 +575,22 @@ export default function HomePage() {
                             {platformCode(track.platform)}
                           </div>
                           <div className="flex-1 px-4 grid-border-r h-full flex items-center truncate uppercase">
-                            {track.title}
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate">{track.title}</span>
+                              <span
+                                className={`shrink-0 border px-2 py-0.5 text-[9px] uppercase ${
+                                  isFailed
+                                    ? "border-[#9e143a] bg-[#ffd7df] text-[#9e143a]"
+                                    : isPreparing
+                                      ? "border-black bg-[#fff4cc] text-black"
+                                      : track.mediaState === "ready"
+                                        ? "border-black bg-[#ecfff9] text-[#0f6d4e]"
+                                        : "border-black bg-white text-black/60"
+                                }`}
+                              >
+                                {mediaLabel}
+                              </span>
+                            </div>
                           </div>
                           <div className="hidden sm:flex flex-1 px-4 grid-border-r h-full items-center truncate opacity-60">
                             {track.artist}
@@ -474,12 +599,13 @@ export default function HomePage() {
                             <button
                               onClick={(event) => {
                                 event.stopPropagation();
-                                handlePlayTrack(track);
+                                void handlePlayTrack(track);
                               }}
+                              disabled={isPreparing}
                               className={`h-7 w-[60px] sm:w-20 border-2 text-[10px] font-black uppercase transition-colors flex items-center justify-center gap-1 ${
                                 isCurrent && isPlaying
                                   ? "border-primary bg-primary text-white"
-                                  : "border-black bg-white text-black hover:bg-black hover:text-white"
+                                  : "border-black bg-white text-black hover:bg-black hover:text-white disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-black"
                               }`}
                             >
                               <span className="material-symbols-outlined text-[14px]">
@@ -555,7 +681,19 @@ export default function HomePage() {
                                 <div className="border border-black px-3 py-2">
                                   <span className="opacity-50">Source:</span> {track.matchedSourceUrl ? "Matched" : "Native"}
                                 </div>
+                                <div className="border border-black px-3 py-2">
+                                  <span className="opacity-50">Playback:</span> {mediaLabel}
+                                </div>
+                                <div className="border border-black px-3 py-2">
+                                  <span className="opacity-50">Playable:</span> {track.isPlayable ? "Yes" : "No"}
+                                </div>
                               </div>
+
+                              {track.lastMediaError ? (
+                                <div className="mb-6 border border-[#9e143a] bg-[#ffd7df] px-3 py-3 text-[10px] uppercase text-[#9e143a]">
+                                  {track.lastMediaError}
+                                </div>
+                              ) : null}
 
                               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 mb-6 items-start">
                                 <div className="space-y-2">
@@ -643,10 +781,11 @@ export default function HomePage() {
                                             <button
                                               type="button"
                                               onClick={() => handlePlayClip(track, clip)}
+                                              disabled={isPreparing}
                                               className={`border border-black px-3 py-2 text-[10px] uppercase font-black ${
                                                 isCurrentClip && isPlaying
                                                   ? "bg-primary text-white border-primary"
-                                                  : "bg-white text-black"
+                                                  : "bg-white text-black disabled:opacity-50"
                                               }`}
                                             >
                                               {isCurrentClip && isPlaying ? "Pause clip" : "Play clip"}
@@ -687,7 +826,13 @@ export default function HomePage() {
                                     />
                                   )}
                                   <span className="text-[10px] font-black z-10 bg-black text-white px-3 py-1 border border-black uppercase">
-                                    {isCurrent && isPlaying ? "PREVIEW_STREAMING" : "PREVIEW_READY"}
+                                    {isCurrent && isPlaying
+                                      ? "PREVIEW_STREAMING"
+                                      : isPreparing
+                                        ? "PREPARING_AUDIO"
+                                        : isFailed
+                                          ? "PREVIEW_BLOCKED"
+                                          : "PREVIEW_READY"}
                                   </span>
                                 </div>
                               </div>

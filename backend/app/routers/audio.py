@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from app.db import get_db
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
+from app.services.media_state import upsert_media_job
 from app.services.ytdlp_service import AudioStreamInfo
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,26 @@ _EXT_TO_MIME: dict[str, str] = {
     ".wav": "audio/wav",
     ".flac": "audio/flac",
 }
+
+_COOKIE_ERROR_MESSAGE = (
+    "YouTube blocked playback for this track. Upload a fresh cookies.txt file from a logged-in "
+    "YouTube session in Settings and try again."
+)
+
+
+def _classify_audio_error(exc: Exception) -> tuple[str, str]:
+    message = str(exc)
+    lowered = message.lower()
+    if (
+        "sign in to confirm you’re not a bot" in lowered
+        or "sign in to confirm you're not a bot" in lowered
+        or "--cookies-from-browser" in lowered
+        or "--cookies" in lowered
+    ):
+        return "cookie_required", _COOKIE_ERROR_MESSAGE
+    if "timed out" in lowered or "timeout" in lowered:
+        return "upstream_timeout", "The source platform timed out while preparing audio for this track."
+    return "upstream_error", f"Could not fetch audio: {message}"
 
 
 def _detect_mime(path: Path) -> str:
@@ -76,11 +97,18 @@ async def stream_audio(
     # Update last_played
     now = datetime.now(timezone.utc).isoformat()
     await db.execute("UPDATE tracks SET last_played = ? WHERE id = ?", (now, track_id))
+    await upsert_media_job(db, track_id, status="running")
     await db.commit()
 
     # Check cache
     cached_path = cache_manager.get(track_id)
     if cached_path is not None:
+        await db.execute(
+            "UPDATE tracks SET media_state = 'ready', last_media_error = NULL, last_prepared_at = ? WHERE id = ?",
+            (now, track_id),
+        )
+        await upsert_media_job(db, track_id, status="succeeded")
+        await db.commit()
         return _serve_from_cache(cached_path, request)
 
     # Uncached YouTube/Spotify tracks should start playback immediately instead of
@@ -92,9 +120,22 @@ async def stream_audio(
             stream_info = await ytdlp_service.get_audio_stream_info(source_url)
         except Exception as exc:
             logger.error("Failed to extract direct stream URL for track %s: %s", track_id, exc)
-            raise HTTPException(status_code=502, detail=f"Could not fetch audio: {exc}") from exc
+            error_code, detail = _classify_audio_error(exc)
+            await db.execute(
+                "UPDATE tracks SET media_state = 'failed', last_media_error = ? WHERE id = ?",
+                (detail, track_id),
+            )
+            await upsert_media_job(db, track_id, status="failed", last_error=f"{error_code}: {detail}")
+            await db.commit()
+            raise HTTPException(status_code=502, detail=detail) from exc
 
         logger.info("Proxying direct audio stream for uncached track %s", track_id)
+        await db.execute(
+            "UPDATE tracks SET media_state = 'ready', last_media_error = NULL, last_prepared_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), track_id),
+        )
+        await upsert_media_job(db, track_id, status="succeeded")
+        await db.commit()
         return await _proxy_direct_stream(request, stream_info)
 
     # Not cached — download via yt-dlp (uses its own throttle-resistant downloader)
@@ -236,12 +277,25 @@ async def _download_and_serve(
                 track_id,
                 stream_exc,
             )
-            raise HTTPException(status_code=502, detail=f"Could not fetch audio: {exc}") from stream_exc
+            error_code, detail = _classify_audio_error(stream_exc)
+            await db.execute(
+                "UPDATE tracks SET media_state = 'failed', last_media_error = ? WHERE id = ?",
+                (detail, track_id),
+            )
+            await upsert_media_job(db, track_id, status="failed", last_error=f"{error_code}: {detail}")
+            await db.commit()
+            raise HTTPException(status_code=502, detail=detail) from stream_exc
 
         logger.warning(
             "Falling back to direct audio proxy for track %s after cache download failure",
             track_id,
         )
+        await db.execute(
+            "UPDATE tracks SET media_state = 'ready', last_media_error = NULL, last_prepared_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), track_id),
+        )
+        await upsert_media_job(db, track_id, status="succeeded")
+        await db.commit()
         return await _proxy_direct_stream(request, stream_info)
 
     actual_path = Path(actual_path)
@@ -252,9 +306,10 @@ async def _download_and_serve(
     # Update DB
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
-        "UPDATE tracks SET cached_at = ? WHERE id = ?",
-        (now, track_id),
+        "UPDATE tracks SET cached_at = ?, media_state = 'ready', last_media_error = NULL, last_prepared_at = ? WHERE id = ?",
+        (now, now, track_id),
     )
+    await upsert_media_job(db, track_id, status="succeeded")
     await db.commit()
 
     logger.info("Cached audio for track %s at %s (%s bytes)", track_id, actual_path, actual_path.stat().st_size)

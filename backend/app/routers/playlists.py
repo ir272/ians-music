@@ -15,6 +15,8 @@ from app.models.schemas import (
     ReorderItemsRequest,
     TrackResponse,
 )
+from app.services.cache_manager import cache_manager
+from app.services.media_state import build_track_response
 
 router = APIRouter(prefix="/api", tags=["playlists"])
 
@@ -108,6 +110,8 @@ async def get_playlist(
             t.source_credit AS t_source_credit,
             t.matched_source_url AS t_matched_source_url,
             t.match_confidence AS t_match_confidence,
+            t.media_state AS t_media_state,
+            t.last_media_error AS t_last_media_error,
             t.created_at AS t_created_at,
             c.id AS c_id,
             c.track_id AS c_track_id,
@@ -129,18 +133,23 @@ async def get_playlist(
 
     items: list[PlaylistItemResponse] = []
     for row in item_rows:
-        track = TrackResponse(
-            track_id=row["t_id"],
-            source_url=row["t_source_url"],
-            platform=row["t_platform"],
-            title=row["t_title"],
-            artist=row["t_artist"],
-            thumbnail_url=row["t_thumbnail_url"],
-            duration_ms=row["t_duration_ms"],
-            source_credit=row["t_source_credit"],
-            matched_source_url=row["t_matched_source_url"],
-            match_confidence=row["t_match_confidence"],
-            created_at=row["t_created_at"],
+        track = build_track_response(
+            {
+                "id": row["t_id"],
+                "source_url": row["t_source_url"],
+                "platform": row["t_platform"],
+                "title": row["t_title"],
+                "artist": row["t_artist"],
+                "thumbnail_url": row["t_thumbnail_url"],
+                "duration_ms": row["t_duration_ms"],
+                "source_credit": row["t_source_credit"],
+                "matched_source_url": row["t_matched_source_url"],
+                "match_confidence": row["t_match_confidence"],
+                "media_state": row["t_media_state"],
+                "last_media_error": row["t_last_media_error"],
+                "created_at": row["t_created_at"],
+            },
+            cache_manager.get(row["t_id"]),
         )
 
         clip = None

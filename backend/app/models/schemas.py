@@ -64,6 +64,9 @@ class TrackResponse(CamelModel):
     source_credit: Optional[str] = None
     matched_source_url: Optional[str] = None
     match_confidence: Optional[float] = None
+    media_state: str = "resolved"
+    is_playable: bool = False
+    last_media_error: Optional[str] = None
     created_at: Optional[str] = None
 
 
@@ -77,6 +80,26 @@ class TrackMixSettingsResponse(CamelModel):
 class UpdateTrackMixSettingsRequest(CamelModel):
     playback_rate: Optional[float] = None
     gain: Optional[float] = None
+
+
+class MediaJobResponse(CamelModel):
+    id: str
+    track_id: str
+    job_type: str
+    status: str
+    attempt_count: int = 0
+    last_error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class TrackMediaStatusResponse(CamelModel):
+    track_id: str
+    media_state: str
+    is_playable: bool
+    active_job: Optional[MediaJobResponse] = None
+    last_media_error: Optional[str] = None
+    cached_path: Optional[str] = None
 
 
 # ── Clips ────────────────────────────────────────────────────────────────────

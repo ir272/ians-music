@@ -1,3 +1,5 @@
+export type TrackMediaState = "resolved" | "queued" | "extracting" | "ready" | "failed" | "stale";
+
 export interface Track {
   trackId: string;
   title: string;
@@ -5,9 +7,13 @@ export interface Track {
   durationMs: number;
   thumbnailUrl: string;
   platform: string;
+  sourceUrl?: string;
   sourceCredit?: string | null;
   matchedSourceUrl?: string | null;
   matchConfidence?: number | null;
+  mediaState?: TrackMediaState;
+  isPlayable?: boolean;
+  lastMediaError?: string | null;
   createdAt?: string | null;
 }
 
@@ -27,6 +33,26 @@ export interface TrackMixSettings {
   playbackRate: number;
   gain: number;
   updatedAt?: string | null;
+}
+
+export interface MediaJob {
+  id: string;
+  trackId: string;
+  jobType: string;
+  status: string;
+  attemptCount: number;
+  lastError?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface TrackMediaStatus {
+  trackId: string;
+  mediaState: TrackMediaState;
+  isPlayable: boolean;
+  activeJob?: MediaJob | null;
+  lastMediaError?: string | null;
+  cachedPath?: string | null;
 }
 
 export interface Playlist {
@@ -59,6 +85,9 @@ export interface ResolveResponse {
   platform: string;
   matchedSourceUrl?: string | null;
   matchConfidence?: number | null;
+  mediaState?: TrackMediaState;
+  isPlayable?: boolean;
+  lastMediaError?: string | null;
   alreadyExists?: boolean;
 }
 

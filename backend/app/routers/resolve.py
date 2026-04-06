@@ -11,6 +11,7 @@ from app.models.schemas import (
     ResolveResponse,
     BatchResolveResponse,
     ResolveCollectionResponse,
+    TrackMediaStatusResponse,
     TrackResponse,
     ReorderItemsRequest,
     TrackMixSettingsResponse,
@@ -18,6 +19,7 @@ from app.models.schemas import (
 )
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
+from app.services.media_state import build_track_media_status, build_track_response
 from app.services.spotify_service import (
     is_spotify_url,
     parse_spotify_url,
@@ -48,26 +50,22 @@ async def list_tracks(
     """List all tracks in the library."""
     cursor = await db.execute(
         "SELECT id, source_url, platform, title, artist, thumbnail_url, duration_ms, source_credit, "
-        "matched_source_url, match_confidence, created_at "
+        "matched_source_url, match_confidence, media_state, last_media_error, created_at "
         "FROM tracks ORDER BY position ASC"
     )
     rows = await cursor.fetchall()
-    return [
-        TrackResponse(
-            track_id=row["id"],
-            source_url=row["source_url"],
-            platform=row["platform"],
-            title=row["title"],
-            artist=row["artist"],
-            thumbnail_url=row["thumbnail_url"],
-            duration_ms=row["duration_ms"],
-            source_credit=row["source_credit"],
-            matched_source_url=row["matched_source_url"],
-            match_confidence=row["match_confidence"],
-            created_at=row["created_at"],
-        )
-        for row in rows
-    ]
+    return [build_track_response(row, cache_manager.get(row["id"])) for row in rows]
+
+
+@router.get("/tracks/{track_id}/media", response_model=TrackMediaStatusResponse)
+async def get_track_media_status(
+    track_id: str,
+    db: aiosqlite.Connection = Depends(get_db),
+) -> TrackMediaStatusResponse:
+    try:
+        return await build_track_media_status(db, track_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/tracks/{track_id}", status_code=204)

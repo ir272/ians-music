@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Track, Clip, PlaylistItem } from "@/types";
-import { getAudioUrl } from "@/lib/api";
+import { getAudioUrl, getTrackMediaStatus } from "@/lib/api";
 
 type LoopMode = "none" | "track" | "playlist";
 
@@ -104,6 +104,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Keep a ref to any pending canplay handler so we can clean it up
   const pendingCanPlayRef = useRef<(() => void) | null>(null);
 
+  const reportPlaybackFailure = useCallback(async (track: Track | null) => {
+    if (!track) return;
+
+    try {
+      const media = await getTrackMediaStatus(track.trackId);
+      window.dispatchEvent(
+        new CustomEvent("openmusic:track-media-status", {
+          detail: media,
+        })
+      );
+      if (media.lastMediaError) {
+        window.dispatchEvent(
+          new CustomEvent("openmusic:playback-error", {
+            detail: {
+              trackId: track.trackId,
+              message: media.lastMediaError,
+            },
+          })
+        );
+      }
+    } catch {
+      window.dispatchEvent(
+        new CustomEvent("openmusic:playback-error", {
+          detail: {
+            trackId: track.trackId,
+            message: "Playback failed and media status could not be refreshed.",
+          },
+        })
+      );
+    }
+  }, []);
+
   const loadAndPlay = useCallback(
     (track: Track, clip: Clip | null) => {
       const audio = audioRef.current;
@@ -141,6 +173,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }).catch((err) => {
           console.error("Playback failed:", err);
           setIsPlaying(false);
+          void reportPlaybackFailure(track);
         });
       };
 
@@ -157,7 +190,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         audio.load();
       }
     },
-    [playbackRate, trackGain, volume]
+    [playbackRate, reportPlaybackFailure, trackGain, volume]
   );
 
   const advanceToNext = useCallback(() => {
@@ -229,6 +262,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       console.error("Audio error:", audio.error);
       setIsBuffering(false);
       setIsPlaying(false);
+      void reportPlaybackFailure(currentTrack);
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -246,7 +280,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("error", handleError);
     };
-  }, [advanceToNext]);
+  }, [advanceToNext, currentTrack, reportPlaybackFailure]);
 
   const playTrack = useCallback(
     (track: Track, clip?: Clip | null) => {
@@ -330,10 +364,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio.play().catch(() => setIsPlaying(false));
+      audio.play().catch(() => {
+        setIsPlaying(false);
+        void reportPlaybackFailure(currentTrack);
+      });
       setIsPlaying(true);
     }
-  }, [isPlaying]);
+  }, [currentTrack, isPlaying, reportPlaybackFailure]);
 
   const pause = useCallback(() => {
     const audio = audioRef.current;
