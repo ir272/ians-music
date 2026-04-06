@@ -12,7 +12,7 @@ from app.db import get_db
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
 from app.services.media_prepare import classify_media_error
-from app.services.media_state import upsert_media_job
+from app.services.media_state import upsert_media_asset, upsert_media_job
 from app.services.ytdlp_service import AudioStreamInfo
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ async def stream_audio(
     # Check cache
     cached_path = cache_manager.get(track_id)
     if cached_path is not None:
+        await upsert_media_asset(db, track_id, cached_path)
         await db.execute(
             "UPDATE tracks SET media_state = 'ready', last_media_error = NULL, last_prepared_at = ? WHERE id = ?",
             (now, track_id),
@@ -282,6 +283,7 @@ async def _download_and_serve(
 
     # Register the downloaded file in the cache manager
     cache_manager.register(track_id, actual_path)
+    await upsert_media_asset(db, track_id, actual_path)
 
     # Update DB
     now = datetime.now(timezone.utc).isoformat()

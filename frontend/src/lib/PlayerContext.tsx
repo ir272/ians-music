@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Track, Clip, PlaylistItem } from "@/types";
-import { getAudioUrl, getTrackMediaStatus, prepareTrack } from "@/lib/api";
+import { getTrackMediaStatus, getTrackPlayback, prepareTrack } from "@/lib/api";
 
 type LoopMode = "none" | "track" | "playlist";
 
@@ -223,7 +223,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      const url = getAudioUrl(track.trackId);
+      const playback = await getTrackPlayback(track.trackId);
+      if (!playback.isPlayable || !playback.playbackUrl) {
+        setIsBuffering(false);
+        setIsPlaying(false);
+        if (playback.lastMediaError) {
+          window.dispatchEvent(
+            new CustomEvent("openmusic:playback-error", {
+              detail: {
+                trackId: track.trackId,
+                message: playback.lastMediaError,
+              },
+            })
+          );
+        }
+        return;
+      }
+
+      const url = playback.playbackUrl;
 
       // audio.src normalizes to absolute after assignment, so compare against
       // the absolute form to avoid unnecessary reloads for the same track.

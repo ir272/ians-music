@@ -79,6 +79,18 @@ CREATE TABLE IF NOT EXISTS media_jobs (
   created_at    TEXT DEFAULT (datetime('now')),
   updated_at    TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS media_assets (
+  id            TEXT PRIMARY KEY,
+  track_id      TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+  storage_kind  TEXT NOT NULL,
+  file_path     TEXT,
+  mime_type     TEXT,
+  file_size     INTEGER,
+  created_at    TEXT DEFAULT (datetime('now')),
+  updated_at    TEXT DEFAULT (datetime('now')),
+  UNIQUE(track_id, storage_kind)
+);
 """
 
 

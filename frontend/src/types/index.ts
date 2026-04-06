@@ -55,6 +55,26 @@ export interface TrackMediaStatus {
   cachedPath?: string | null;
 }
 
+export interface MediaAsset {
+  id: string;
+  trackId: string;
+  storageKind: string;
+  filePath?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface TrackPlayback {
+  trackId: string;
+  mediaState: TrackMediaState;
+  isPlayable: boolean;
+  playbackUrl?: string | null;
+  lastMediaError?: string | null;
+  asset?: MediaAsset | null;
+}
+
 export interface Playlist {
   id: string;
   name: string;

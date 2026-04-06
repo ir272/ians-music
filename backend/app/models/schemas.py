@@ -93,6 +93,17 @@ class MediaJobResponse(CamelModel):
     updated_at: Optional[str] = None
 
 
+class MediaAssetResponse(CamelModel):
+    id: str
+    track_id: str
+    storage_kind: str
+    file_path: Optional[str] = None
+    mime_type: Optional[str] = None
+    file_size: Optional[int] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class TrackMediaStatusResponse(CamelModel):
     track_id: str
     media_state: str
@@ -100,6 +111,15 @@ class TrackMediaStatusResponse(CamelModel):
     active_job: Optional[MediaJobResponse] = None
     last_media_error: Optional[str] = None
     cached_path: Optional[str] = None
+
+
+class TrackPlaybackResponse(CamelModel):
+    track_id: str
+    media_state: str
+    is_playable: bool
+    playback_url: Optional[str] = None
+    last_media_error: Optional[str] = None
+    asset: Optional[MediaAssetResponse] = None
 
 
 # ── Clips ────────────────────────────────────────────────────────────────────

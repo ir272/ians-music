@@ -9,7 +9,7 @@ import aiosqlite
 from app.db import DB_PATH
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
-from app.services.media_state import upsert_media_job
+from app.services.media_state import upsert_media_asset, upsert_media_job
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ async def prepare_track_media(track_id: str) -> None:
         cached_path = cache_manager.get(track_id)
         now = datetime.now(timezone.utc).isoformat()
         if cached_path is not None:
+            await upsert_media_asset(db, track_id, cached_path)
             await db.execute(
                 "UPDATE tracks SET media_state = 'ready', last_media_error = NULL, last_prepared_at = ? WHERE id = ?",
                 (now, track_id),
@@ -117,6 +118,7 @@ async def prepare_track_media(track_id: str) -> None:
 
         actual_path = Path(actual_path)
         cache_manager.register(track_id, actual_path)
+        await upsert_media_asset(db, track_id, actual_path)
         finished_at = datetime.now(timezone.utc).isoformat()
         await db.execute(
             """
@@ -130,4 +132,3 @@ async def prepare_track_media(track_id: str) -> None:
         await db.commit()
     finally:
         await db.close()
-

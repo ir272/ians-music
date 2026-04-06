@@ -11,6 +11,7 @@ from app.models.schemas import (
     ResolveResponse,
     BatchResolveResponse,
     ResolveCollectionResponse,
+    TrackPlaybackResponse,
     TrackMediaStatusResponse,
     TrackResponse,
     ReorderItemsRequest,
@@ -20,7 +21,12 @@ from app.models.schemas import (
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
 from app.services.media_prepare import prepare_track_media
-from app.services.media_state import build_track_media_status, build_track_response, upsert_media_job
+from app.services.media_state import (
+    build_track_media_status,
+    build_track_playback_response,
+    build_track_response,
+    upsert_media_job,
+)
 from app.services.spotify_service import (
     is_spotify_url,
     parse_spotify_url,
@@ -65,6 +71,19 @@ async def get_track_media_status(
 ) -> TrackMediaStatusResponse:
     try:
         return await build_track_media_status(db, track_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/tracks/{track_id}/playback", response_model=TrackPlaybackResponse)
+async def get_track_playback(
+    track_id: str,
+    db: aiosqlite.Connection = Depends(get_db),
+) -> TrackPlaybackResponse:
+    try:
+        response = await build_track_playback_response(db, track_id)
+        await db.commit()
+        return response
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

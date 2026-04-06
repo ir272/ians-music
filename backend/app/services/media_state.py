@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import mimetypes
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 import aiosqlite
 
-from app.models.schemas import MediaJobResponse, TrackMediaStatusResponse, TrackResponse
+from app.models.schemas import (
+    MediaAssetResponse,
+    MediaJobResponse,
+    TrackMediaStatusResponse,
+    TrackPlaybackResponse,
+    TrackResponse,
+)
 from app.services.cache_manager import cache_manager
 
 
@@ -38,6 +45,11 @@ def build_track_response(row: aiosqlite.Row, cached_path: Path | None) -> TrackR
         last_media_error=row["last_media_error"],
         created_at=row["created_at"],
     )
+
+
+def _detect_mime(path: Path) -> str:
+    guessed = mimetypes.guess_type(str(path))[0]
+    return guessed or "application/octet-stream"
 
 
 async def upsert_media_job(
@@ -129,6 +141,90 @@ async def fetch_active_media_job(db: aiosqlite.Connection, track_id: str) -> Med
     )
 
 
+async def upsert_media_asset(
+    db: aiosqlite.Connection,
+    track_id: str,
+    path: Path,
+    *,
+    storage_kind: str = "cache",
+) -> MediaAssetResponse:
+    now = datetime.now(timezone.utc).isoformat()
+    asset_id = str(uuid.uuid4())
+    mime_type = _detect_mime(path)
+    file_size = path.stat().st_size
+    file_path = str(path)
+
+    cursor = await db.execute(
+        """
+        SELECT id, created_at
+        FROM media_assets
+        WHERE track_id = ? AND storage_kind = ?
+        LIMIT 1
+        """,
+        (track_id, storage_kind),
+    )
+    existing = await cursor.fetchone()
+
+    if existing is None:
+        await db.execute(
+            """
+            INSERT INTO media_assets (id, track_id, storage_kind, file_path, mime_type, file_size, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (asset_id, track_id, storage_kind, file_path, mime_type, file_size, now, now),
+        )
+        created_at = now
+    else:
+        asset_id = existing["id"]
+        created_at = existing["created_at"]
+        await db.execute(
+            """
+            UPDATE media_assets
+            SET file_path = ?, mime_type = ?, file_size = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (file_path, mime_type, file_size, now, asset_id),
+        )
+
+    return MediaAssetResponse(
+        id=asset_id,
+        track_id=track_id,
+        storage_kind=storage_kind,
+        file_path=file_path,
+        mime_type=mime_type,
+        file_size=file_size,
+        created_at=created_at,
+        updated_at=now,
+    )
+
+
+async def fetch_media_asset(db: aiosqlite.Connection, track_id: str) -> MediaAssetResponse | None:
+    cursor = await db.execute(
+        """
+        SELECT id, track_id, storage_kind, file_path, mime_type, file_size, created_at, updated_at
+        FROM media_assets
+        WHERE track_id = ?
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+        """,
+        (track_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+
+    return MediaAssetResponse(
+        id=row["id"],
+        track_id=row["track_id"],
+        storage_kind=row["storage_kind"],
+        file_path=row["file_path"],
+        mime_type=row["mime_type"],
+        file_size=row["file_size"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
 async def build_track_media_status(db: aiosqlite.Connection, track_id: str) -> TrackMediaStatusResponse:
     cursor = await db.execute(
         """
@@ -153,4 +249,33 @@ async def build_track_media_status(db: aiosqlite.Connection, track_id: str) -> T
         active_job=active_job,
         last_media_error=row["last_media_error"],
         cached_path=str(cached_path) if cached_path is not None else None,
+    )
+
+
+async def build_track_playback_response(db: aiosqlite.Connection, track_id: str) -> TrackPlaybackResponse:
+    cursor = await db.execute(
+        """
+        SELECT id, media_state, last_media_error
+        FROM tracks
+        WHERE id = ?
+        """,
+        (track_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        raise ValueError("Track not found")
+
+    cached_path = cache_manager.get(track_id)
+    asset = await fetch_media_asset(db, track_id)
+    if cached_path is not None:
+        asset = await upsert_media_asset(db, track_id, cached_path)
+
+    media_state = infer_track_media_state(cached_path, row["media_state"], row["last_media_error"])
+    return TrackPlaybackResponse(
+        track_id=track_id,
+        media_state=media_state,
+        is_playable=media_state == "ready",
+        playback_url=f"/api/audio/{track_id}" if media_state == "ready" else None,
+        last_media_error=row["last_media_error"],
+        asset=asset,
     )
