@@ -7,7 +7,7 @@ primary_region = "dfw"
   DB_PATH = "/data/openmusic.db"
   CACHE_DIR = "/data/cache"
   MAX_CACHE_SIZE_GB = "1"
-  DENO_DIR = "/bgutil/.deno"
+  DENO_DIR = "/root/bgutil-ytdlp-pot-provider/.deno"
 
 [http_service]
   internal_port = 8000

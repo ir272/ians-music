@@ -17,17 +17,14 @@ RUN apt-get update && apt-get install -y \
     && curl -fsSL https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone bgutil server and install its Node deps (builds canvas native binary)
-RUN git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /bgutil \
-    && cd /bgutil/server \
+# Clone bgutil directly to the path the pip package expects (no symlink = no Deno permission issues)
+RUN git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /root/bgutil-ytdlp-pot-provider \
+    && cd /root/bgutil-ytdlp-pot-provider/server \
     && npm ci --omit=dev --no-audit --no-fund
 
-# bgutil-ytdlp-pot-provider pip package looks for server code here
-RUN mkdir -p /root/bgutil-ytdlp-pot-provider \
-    && ln -s /bgutil/server /root/bgutil-ytdlp-pot-provider/server
-
-# Pre-cache Deno dependencies so startup and per-request token generation are fast
-RUN cd /bgutil/server && DENO_DIR=/bgutil/.deno deno cache src/main.ts src/generate_once.ts
+# Pre-cache all Deno dependencies (main.ts = HTTP server, generate_once.ts = script mode fallback)
+RUN cd /root/bgutil-ytdlp-pot-provider/server \
+    && DENO_DIR=/root/bgutil-ytdlp-pot-provider/.deno deno cache src/main.ts src/generate_once.ts
 
 WORKDIR /app
 
