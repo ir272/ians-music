@@ -419,9 +419,9 @@ export default function HomePage() {
             <button
               onClick={() => setShowSettings(true)}
               title="Settings"
-              className="ml-3 text-black/50 hover:text-black transition-colors material-symbols-outlined text-[20px]"
+              className="ml-3 shrink-0 flex items-center justify-center w-8 h-8 border border-black bg-white hover:bg-black hover:text-white transition-colors"
             >
-              settings
+              <span className="material-symbols-outlined text-[18px]">settings</span>
             </button>
           </div>
 
