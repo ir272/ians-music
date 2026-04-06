@@ -47,7 +47,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     const normalized = errorBody.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     const fallbackMessage =
       res.status >= 500
-        ? "OpenMusic backend error. Make sure the backend is running on port 8000."
+        ? "OpenMusic backend error. The hosted API may be unavailable or waking up."
         : `Request failed with status ${res.status}`;
     throw new ApiError(normalized || fallbackMessage, res.status);
   }
@@ -230,4 +230,3 @@ export async function uploadCookieFile(file: File): Promise<{ ok: boolean }> {
 export async function deleteCookieFile(): Promise<void> {
   await request<void>("/api/settings/cookies", { method: "DELETE" });
 }
-
