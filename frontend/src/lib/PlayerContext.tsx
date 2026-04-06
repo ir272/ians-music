@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Track, Clip, PlaylistItem } from "@/types";
-import { getAudioUrl, getTrackMediaStatus } from "@/lib/api";
+import { getAudioUrl, getTrackMediaStatus, prepareTrack } from "@/lib/api";
 
 type LoopMode = "none" | "track" | "playlist";
 
@@ -54,6 +54,8 @@ export function usePlayerContext(): PlayerContextValue {
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+  const PREPARE_POLL_ATTEMPTS = 20;
+  const PREPARE_POLL_INTERVAL_MS = 1500;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [currentClip, setCurrentClip] = useState<Clip | null>(null);
@@ -136,8 +138,64 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const publishTrackMediaStatus = useCallback(async (trackId: string) => {
+    const media = await getTrackMediaStatus(trackId);
+    window.dispatchEvent(
+      new CustomEvent("openmusic:track-media-status", {
+        detail: media,
+      })
+    );
+    return media;
+  }, []);
+
+  const waitForPreparedTrack = useCallback(async (track: Track) => {
+    let media = await prepareTrack(track.trackId);
+    window.dispatchEvent(
+      new CustomEvent("openmusic:track-media-status", {
+        detail: media,
+      })
+    );
+
+    if (media.isPlayable || media.mediaState === "ready") {
+      return media;
+    }
+
+    for (let attempt = 0; attempt < PREPARE_POLL_ATTEMPTS; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, PREPARE_POLL_INTERVAL_MS));
+      media = await publishTrackMediaStatus(track.trackId);
+
+      if (media.isPlayable || media.mediaState === "ready") {
+        return media;
+      }
+
+      if (media.mediaState === "failed") {
+        if (media.lastMediaError) {
+          window.dispatchEvent(
+            new CustomEvent("openmusic:playback-error", {
+              detail: {
+                trackId: track.trackId,
+                message: media.lastMediaError,
+              },
+            })
+          );
+        }
+        return media;
+      }
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("openmusic:playback-error", {
+        detail: {
+          trackId: track.trackId,
+          message: `Timed out while preparing "${track.title}" for playback.`,
+        },
+      })
+    );
+    return media;
+  }, [publishTrackMediaStatus]);
+
   const loadAndPlay = useCallback(
-    (track: Track, clip: Clip | null) => {
+    async (track: Track, clip: Clip | null) => {
       const audio = audioRef.current;
       if (!audio) return;
 
@@ -151,6 +209,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentClip(clip);
       setDurationMs(track.durationMs);
       setIsBuffering(true);
+
+      if (!track.isPlayable && track.mediaState !== "ready") {
+        const media = await waitForPreparedTrack(track);
+        if (!media.isPlayable && media.mediaState !== "ready") {
+          setIsBuffering(false);
+          setIsPlaying(false);
+          return;
+        }
+      } else {
+        void publishTrackMediaStatus(track.trackId).catch(() => {
+          // Ignore refresh failures here; audio errors are handled by the player itself.
+        });
+      }
 
       const url = getAudioUrl(track.trackId);
 
@@ -190,7 +261,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         audio.load();
       }
     },
-    [playbackRate, reportPlaybackFailure, trackGain, volume]
+    [playbackRate, publishTrackMediaStatus, reportPlaybackFailure, trackGain, volume, waitForPreparedTrack]
   );
 
   const advanceToNext = useCallback(() => {
@@ -224,7 +295,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentIndex(nextIdx);
       const item = pl[nextIdx];
       if (item) {
-        loadAndPlay(item.track, item.clip);
+        void loadAndPlay(item.track, item.clip);
       }
     } else {
       setIsPlaying(false);
@@ -286,7 +357,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     (track: Track, clip?: Clip | null) => {
       setPlaylist([]);
       setCurrentIndex(-1);
-      loadAndPlay(track, clip ?? null);
+      void loadAndPlay(track, clip ?? null);
     },
     [loadAndPlay]
   );
@@ -297,7 +368,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentIndex(startIndex);
       const item = items[startIndex];
       if (item) {
-        loadAndPlay(item.track, item.clip);
+        void loadAndPlay(item.track, item.clip);
       }
     },
     [loadAndPlay]
@@ -399,7 +470,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentIndex(prevIdx);
       const item = pl[prevIdx];
       if (item) {
-        loadAndPlay(item.track, item.clip);
+        void loadAndPlay(item.track, item.clip);
       }
     } else {
       const audio = audioRef.current;

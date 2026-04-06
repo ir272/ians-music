@@ -144,6 +144,12 @@ export async function getTrackMediaStatus(trackId: string): Promise<TrackMediaSt
   return request<TrackMediaStatus>(`/api/tracks/${trackId}/media`);
 }
 
+export async function prepareTrack(trackId: string): Promise<TrackMediaStatus> {
+  return request<TrackMediaStatus>(`/api/tracks/${trackId}/prepare`, {
+    method: "POST",
+  });
+}
+
 export async function updateTrackMixSettings(
   trackId: string,
   data: {

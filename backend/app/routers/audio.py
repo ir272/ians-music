@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from app.db import get_db
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
+from app.services.media_prepare import classify_media_error
 from app.services.media_state import upsert_media_job
 from app.services.ytdlp_service import AudioStreamInfo
 
@@ -30,27 +31,6 @@ _EXT_TO_MIME: dict[str, str] = {
     ".wav": "audio/wav",
     ".flac": "audio/flac",
 }
-
-_COOKIE_ERROR_MESSAGE = (
-    "YouTube blocked playback for this track. Upload a fresh cookies.txt file from a logged-in "
-    "YouTube session in Settings and try again."
-)
-
-
-def _classify_audio_error(exc: Exception) -> tuple[str, str]:
-    message = str(exc)
-    lowered = message.lower()
-    if (
-        "sign in to confirm you’re not a bot" in lowered
-        or "sign in to confirm you're not a bot" in lowered
-        or "--cookies-from-browser" in lowered
-        or "--cookies" in lowered
-    ):
-        return "cookie_required", _COOKIE_ERROR_MESSAGE
-    if "timed out" in lowered or "timeout" in lowered:
-        return "upstream_timeout", "The source platform timed out while preparing audio for this track."
-    return "upstream_error", f"Could not fetch audio: {message}"
-
 
 def _detect_mime(path: Path) -> str:
     """Detect MIME type from file extension, falling back to audio/webm."""
@@ -120,7 +100,7 @@ async def stream_audio(
             stream_info = await ytdlp_service.get_audio_stream_info(source_url)
         except Exception as exc:
             logger.error("Failed to extract direct stream URL for track %s: %s", track_id, exc)
-            error_code, detail = _classify_audio_error(exc)
+            error_code, detail = classify_media_error(exc)
             await db.execute(
                 "UPDATE tracks SET media_state = 'failed', last_media_error = ? WHERE id = ?",
                 (detail, track_id),
@@ -277,7 +257,7 @@ async def _download_and_serve(
                 track_id,
                 stream_exc,
             )
-            error_code, detail = _classify_audio_error(stream_exc)
+            error_code, detail = classify_media_error(stream_exc)
             await db.execute(
                 "UPDATE tracks SET media_state = 'failed', last_media_error = ? WHERE id = ?",
                 (detail, track_id),

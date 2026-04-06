@@ -2,7 +2,7 @@ import logging
 import uuid
 
 import aiosqlite
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.db import get_db
@@ -19,7 +19,8 @@ from app.models.schemas import (
 )
 from app.services import ytdlp_service
 from app.services.cache_manager import cache_manager
-from app.services.media_state import build_track_media_status, build_track_response
+from app.services.media_prepare import prepare_track_media
+from app.services.media_state import build_track_media_status, build_track_response, upsert_media_job
 from app.services.spotify_service import (
     is_spotify_url,
     parse_spotify_url,
@@ -66,6 +67,47 @@ async def get_track_media_status(
         return await build_track_media_status(db, track_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/tracks/{track_id}/prepare", response_model=TrackMediaStatusResponse)
+async def prepare_track(
+    track_id: str,
+    background_tasks: BackgroundTasks,
+    db: aiosqlite.Connection = Depends(get_db),
+) -> TrackMediaStatusResponse:
+    cursor = await db.execute(
+        "SELECT id FROM tracks WHERE id = ?",
+        (track_id,),
+    )
+    if await cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    cached_path = cache_manager.get(track_id)
+    if cached_path is not None:
+        return await build_track_media_status(db, track_id)
+
+    cursor = await db.execute(
+        """
+        SELECT status
+        FROM media_jobs
+        WHERE track_id = ? AND job_type = 'prepare_playback_asset'
+        ORDER BY datetime(updated_at) DESC
+        LIMIT 1
+        """,
+        (track_id,),
+    )
+    existing_job = await cursor.fetchone()
+
+    if existing_job is None or existing_job["status"] not in {"queued", "running"}:
+        await db.execute(
+            "UPDATE tracks SET media_state = 'queued', last_media_error = NULL WHERE id = ?",
+            (track_id,),
+        )
+        await upsert_media_job(db, track_id, status="queued")
+        await db.commit()
+        background_tasks.add_task(prepare_track_media, track_id)
+
+    return await build_track_media_status(db, track_id)
 
 
 @router.delete("/tracks/{track_id}", status_code=204)
