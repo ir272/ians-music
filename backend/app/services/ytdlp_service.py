@@ -361,7 +361,11 @@ def _search_youtube_sync(query: str, num_results: int = 5) -> list[YouTubeSearch
     """Search YouTube via yt-dlp and return results with metadata."""
     opts = {
         **_base_opts(),
-        "extract_flat": False,
+        # extract_flat=True: fetch search result metadata only, no per-video player requests.
+        # Per-video player requests trigger YouTube bot checks from datacenter IPs.
+        # All fields needed for scoring (title, duration, view_count, channel_is_verified)
+        # are available in flat search results.
+        "extract_flat": True,
         "default_search": "ytsearch",
     }
 
@@ -386,8 +390,13 @@ def _search_youtube_sync(query: str, num_results: int = 5) -> list[YouTubeSearch
         is_topic = channel.endswith(" - Topic")
         is_verified = bool(entry.get("channel_is_verified"))
 
+        # Flat entries use "url" (a /watch?v=... path or full URL); reconstruct if needed
+        raw_url = entry.get("webpage_url") or entry.get("url", "")
+        if raw_url and not raw_url.startswith("http"):
+            raw_url = f"https://www.youtube.com/watch?v={entry.get('id', '')}"
+
         results.append(YouTubeSearchResult(
-            url=entry.get("webpage_url") or entry.get("url", ""),
+            url=raw_url,
             title=entry.get("title", ""),
             duration_ms=duration_ms,
             view_count=entry.get("view_count"),
